@@ -1,0 +1,246 @@
+﻿@using Health.Web.Areas.Products.Models
+@using Health.Web.Web.Framework
+@model IEnumerable<Health.Web.Areas.Products.Models.Question.QuestionViewModel>
+@{
+    var areaName = ViewContext.RouteData.DataTokens["area"];
+    var controllerName = ViewContext.RouteData.Values["controller"].ToString();
+
+    /* Acquire url params data */
+    int? questionGroupId = null;
+    if (ViewContext.RouteData.Values["questionGroupId"] != null)
+    {
+        questionGroupId = Convert.ToInt32(ViewContext.RouteData.Values["questionGroupId"]);
+    }
+
+    /* Action Urls */
+    var pageData = Url.Action("QuestionListPageData", @controllerName, new { area = (string)@areaName });
+    var createUrl = Url.Action("CreateQuestion", @controllerName, new { area = (string)@areaName });
+    var updateUrl = Url.Action("UpdateQuestion", @controllerName, new { area = (string)@areaName });
+    var goBackToQuestionGroupListUrl = Url.Action("Index", @controllerName, new { area = (string)@areaName });
+
+    /* Steps Menu Data */
+    var menuData = ViewContext.ViewData;
+}
+
+@section PageStyleInclude    {
+    <style>
+        .portlet.sticky > .portlet-title {
+            border-color: transparent !important;
+            border-bottom-color: transparent !important;
+        }
+
+        div.is-sticky > div.sticky { /* make the divider line darker when sticky gets active */
+            border-bottom: 1px solid #b2bac7;
+        }
+    </style>
+}
+@Html.AntiForgeryToken()
+<div class="portlet light portlet-fit sticky">
+    <div class="portlet-title title-area">
+        <div class="caption">
+            <h3 class="page-title title-area">Soru Havuzu</h3>
+        </div>
+        <div class="actions title-area">
+            <div class="action-btn-div">
+                <button class="btn blue-madison" id="add-new" onclick="openAjaxPopUp('@createUrl');">
+                    <i class="fa fa-plus"></i> Yeni Ekle
+                </button>
+            </div>
+            <div style="float: right;">
+                <button type="button" class="btn" onclick="goTo('@goBackToQuestionGroupListUrl');">
+                    <i class="fa fa-arrow-circle-left"></i> Soru Seti Listesine Dön
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+@Html.Partial("_QuestionGroupSteps", menuData)
+<div class="portlet light portlet-fit portlet-datatable">
+    <div class="portlet-body">
+        <div id="bootstrap_alerts_demo"> </div>
+        <div class="table-container">
+            <h4 class="productSubTitle">Tüm Soru Listesi</h4>
+            <table class="table table-striped table-bordered table-hover" id="datatable-questions">
+                <thead>
+                    <tr role="row" class="heading">
+                        <th width="2%">Id</th>
+                        @*<th width="1%" style="text-align: center"></th>*@
+                        <th width="58%">Soru Adı</th>
+                        <th width="15%" style="text-align: center">Zorunlu Mu</th>
+                        <th width="15%" style="text-align: center">Görünür Mü</th>
+                        <th width="5%"></th>
+                        <th width="5%"></th>
+                    </tr>
+                </thead>
+                <tbody> </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@* Add new record modal *@
+<div id="ajaxModal" class="modal fade in">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div id="ajaxModalContent"></div>
+        </div>
+    </div>
+</div>
+
+<div id="answerModal" class="modal fade" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" id="answerModalContent"></div>
+    </div>
+</div>
+
+@section PageScriptInclude {
+
+}
+
+@section PageScriptContent {
+    <script>
+        var __RequestVerificationToken = function() { return $('input[name="__RequestVerificationToken"]').val(); }
+        var questionsGrid = new Datatable();
+
+        $(document).ready(function() {
+
+            questionsGrid = $("#datatable-questions").DataTable({
+                serverSide: true,
+                language: {
+                    url: "/Scripts/DataTables/Turkish.json"
+                },
+                ajax: {
+                    url: "@pageData",
+                    beforeSend: function(xhr) {
+                        App.blockUI({
+                            target: ".page-container",
+                            iconOnly: false,
+                            message: "<h4>Yükleniyor...</h4>",
+                            boxed: true
+                        });
+                    },
+                    complete: function(xhr) {
+                        App.unblockUI(".page-container");
+                    }
+                },
+                processing: false,
+                searching: false,
+                info: false,
+                paging: false,
+                ordering: false,
+                columns: [
+                    {
+                        data: 'id',
+                        sortable: true,
+                        searchable: true
+                    },
+                    {
+                        data: 'name',
+                        sortable: true,
+                        searchable: true,
+                        createdCell: function(td, cellData, rowData, row, col) {
+                            if (!rowData.isParent) {
+                                $(td).css('padding-left', '18px');
+                            }
+                        }
+                    }, {
+                        data: 'isRequired',
+                        sortable: false,
+                        searchable: false,
+                        createdCell: function(td, cellData, rowData, row, col) {
+                            $(td)
+                                .css('text-align', 'center')
+                                .css('padding', '9px 10px 7px 10px')
+                                .css('font-size', '20px');
+                        },
+                        type: "html",
+                        render: function(data, type, full, meta) {
+                            if (data == 1) {
+                                return htmlStringInject("inj-icon-checked");
+                            } else {
+                                return htmlStringInject("inj-icon-unchecked");
+                            }
+                        }
+                    }, {
+                        data: 'isVisibleByDefault',
+                        sortable: false,
+                        searchable: false,
+                        createdCell: function(td, cellData, rowData, row, col) {
+                            $(td)
+                                .css('text-align', 'center')
+                                .css('padding', '9px 10px 7px 10px')
+                                .css('font-size', '20px');
+                        },
+                        type: "html",
+                        render: function(data, type, full, meta) {
+                            if (data == 1) {
+                                return htmlStringInject("inj-icon-checked");
+                            } else {
+                                return htmlStringInject("inj-icon-unchecked");
+                            }
+                        }
+                    },{
+                        data: "id",
+                        orderable: false,
+                        render: function(data, type, row, meta) {
+                            return '<button onclick="openAnswerManager(' + data + ')" class="btn green btn-xs"><i class="fa fa-list"></i> Cevapları Yönet</button>';
+                        }
+                        }
+                    , {
+                        data: "id",
+                        orderable: false,
+                        createdCell: function(td, cellData, rowData, row, col) {
+                            $(td).css('text-align', 'center');
+                        },
+                        type: "html",
+                        render: function(data, type, full, meta) {
+                            return '<button onclick="openAjaxPopUp(\'@updateUrl/' +
+                                data +
+                                '\');"' +
+                                ' class="btn default btn-xs"><i class="fa fa-pencil-square-o"></i> Düzenle </button>';
+                        }
+                    }
+                ]
+            });
+
+        }); /* ends $(document).ready() */
+
+        function ajaxPopUpSucceed(xhr) {
+            toastr.success(xhr.result.text, 'İşlem Başarılı');
+            questionsGrid.ajax.reload(function(json) {
+                if (json.recordsTotal === 0) {
+                    $("div.step-thin #step4").removeClass("done");
+                }
+            });
+        }
+
+        function openAnswerManager(questionId) {
+    $.ajax({
+        url: '/Products/QuestionGroup/ManageAnswers',
+        data: { questionId: questionId },
+        type: 'GET',
+        success: function (html) {
+            $('#answerModalContent').html(html);
+            $('#answerModal').modal('show');
+        },
+        error: function () {
+            toastr.error('Cevaplar yüklenemedi.');
+        }
+    });
+}
+
+        function goTo(url) {
+            App.blockUI({
+                target: ".page-container",
+                iconOnly: false,
+                message: "<h4>Sayfa Yükleniyor...</h4>",
+                boxed: true
+            });
+            location.href = url;
+        }
+
+
+
+    </script>
+    @Html.RenderScripts() @*for rendering scripts from partial views and editor templates *@
+}

@@ -1,0 +1,274 @@
+﻿@using Health.Web.Areas.Products.Models
+@using Health.Web.Web.Framework
+@model Health.Web.Areas.Products.Models.Question.QuestionGroupViewModel
+
+@{
+    var areaName = ViewContext.RouteData.DataTokens["area"];
+    var controllerName = ViewContext.RouteData.Values["controller"].ToString();
+    var actionName = ViewContext.RouteData.Values["action"].ToString();
+
+    /* Acquire param data and action proccess type (update/create) */
+    int? questionGroupId = null;
+    string process = "create";
+    if (Model.Id != 0)
+    {
+        process = "update";
+        questionGroupId = (int?)Model.Id;
+    }
+
+    /* Button display options */
+    string deleteBtnDisplay = process == "update" ? "block" : "none";
+    string addNewBtnDisplay = process == "create" ? "block" : "none";
+    string cloneBtnDisplay = process == "update" ? "block" : "none";
+    string saveBtnDisplay = process == "update" ? "block" : "none";
+
+    /* Action Urls */
+    var addAction = Url.Action("CreateOrUpdate", @controllerName, new { area = (string)@areaName });
+    var updateAction = Url.Action("CreateOrUpdate", @controllerName, new { area = (string)@areaName });
+    var addUpdateUrl = Url.Action("CreateUpdate", @controllerName, new { area = (string)@areaName });
+    var cloneAction = Url.Action("CloneProduct", @controllerName, new { area = (string)@areaName });
+    var deleteAction = Url.Action("DeleteProduct", @controllerName, new { area = (string)@areaName });
+    var goBackAction = Url.Action("Index", @controllerName, new { area = (string)@areaName });
+
+    /* Steps Menu Data - Pass this view's data over to the partial also */
+    var menuData = ViewContext.ViewData;
+}
+
+@section PageStyleInclude    {
+    <style>
+        .portlet.sticky > .portlet-title {
+            border-color: transparent !important;
+            border-bottom-color: transparent !important;
+        }
+
+        div.is-sticky > div.sticky { /* make the divider line darker when sticky gets active */
+            border-bottom: 1px solid #b2bac7;
+        }
+
+        .mt-checkbox {
+            margin-bottom: 0 !important;
+        }
+    </style>
+}
+
+<div class="portlet light portlet-fit sticky">
+    <div class="portlet-title title-area">
+        <div class="caption">
+            <h3 class="page-title title-area">@Html.Raw(ViewBag.PageTitle)</h3>
+        </div>
+        <div class="actions title-area">
+            <div class="action-btn-div" style="display: @saveBtnDisplay">
+                <button class="btn blue-madison" id="save">
+                    <i class="fa fa-check"></i> Kaydet
+                </button>
+            </div>
+            <div class="action-btn-div" style="display: @addNewBtnDisplay">
+                <button class="btn blue-madison" id="add-new">
+                    <i class="fa fa-check"></i> Kaydet
+                </button>
+            </div>
+            <div class="action-btn-div" style="display: @cloneBtnDisplay">
+                <button class="btn" id="clone">
+                    <i class="fa fa-clone"></i> Kopyala
+                </button>
+            </div>
+            <div class="action-btn-div">
+                <button type="button" class="btn" onclick="goTo('@goBackAction');">
+                    <i class="fa fa-arrow-circle-left"></i> Soru Seti Listesine Dön
+                </button>
+            </div>
+            <div style="float: right; display: @deleteBtnDisplay">
+                <button class="btn red" id="delete" data-toggle="confirmation"
+                        data-popout="true" data-placement="left">
+                    <i class="fa fa-trash-o"></i> Kaydı Sil
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+@Html.Partial("_QuestionGroupSteps", menuData)
+@using (Html.BeginForm(actionName, @controllerName, FormMethod.Post, new { @Id = @actionName + "Form" }))
+{
+    @Html.AntiForgeryToken()
+    <div class="portlet box blue-ebonyclay" style="margin-top: 20px">
+        <div class="portlet-title">
+            <div class="caption">
+                <span class="caption-subject">Soru Seti Bilgileri</span>
+            </div>
+        </div>
+        <div class="portlet-body">
+            <div class="row">
+                <div class="form-horizontal col-md-6">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                @Html.LabelFor(model => model.Id, new { @class = "control-label col-md-4" })
+                                <div class="col-md-8">
+                                    @Html.TextBoxFor(model => model.Id, new { @class = "form-control", @readonly = "readonly" })
+                                    @Html.ValidationMessageFor(model => model.Id, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                @Html.LabelFor(model => model.Name, new { @class = "control-label col-md-4" })
+                                <div class="col-md-8">
+                                    @Html.TextBoxFor(model => model.Name, new { @class = "form-control" })
+                                    @Html.ValidationMessageFor(model => model.Name, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                @Html.LabelFor(model => model.Description, new { @class = "control-label col-md-4" })
+                                <div class="col-md-8">
+                                    @Html.EditorFor(model => model.Description, new { @class = "form-control" })
+                                    @Html.ValidationMessageFor(model => model.Description, "", new { @class = "text-danger" })
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            <div class="row">
+                <div class="form-horizontal">
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+
+}
+@section PageScriptInclude {
+    <script src="~/assets/global/plugins/serialize/jquery.serializejson.min.js"></script>
+}
+@section PageScriptContent {
+    <script>
+
+        var __RequestVerificationToken = function () { return $('input[name="__RequestVerificationToken"]').val(); };
+        var formSelector = "#@actionName" + "Form";
+        var formData;
+
+        $(document).ready(function () {
+
+
+
+            $("#add-new").on("click", function () {
+                /* convert form data to JSON */
+                /* https://github.com/marioizquierdo/jquery.serializeJSON */
+                var formData = $(formSelector).serializeJSON({ checkboxUncheckedValue: "false" });/* normally unchecked checkboxes are ignored */
+                var data = {
+                    __RequestVerificationToken: __RequestVerificationToken,
+                    questionGroupViewModel: formData,
+                    process: "create"
+                };
+                var xhrParams = {
+                    requestMethod: "POST",
+                    url: "@addAction",
+                    dataType: "json",
+                    data: data,
+                    formToValidateObj: $(formSelector),
+                    blockElem: ".page-container",
+                    iconOnly: false,
+                    message: "Kaydediliyor...",
+                    unblockOnComplete: false
+                };
+                var xhrPromise = jqAjax(xhrParams);
+                xhrPromise.done(function (xhr) {
+                    if (xhr.result.success) {
+                        toastr.success(xhr.result.text, 'İşlem Başarılı');
+                    } else {
+                        swal("Dikkat", xhr.result.text, "warning");
+                    }
+                    goTo("@addUpdateUrl/" + xhr.result.id);
+                });
+            });
+
+            $("#save").on("click", function () {
+                /* convert form data to JSON */
+                /* https://github.com/marioizquierdo/jquery.serializeJSON */
+                var formData = $(formSelector).serializeJSON({ checkboxUncheckedValue: "false" });/* normally unchecked checkboxes are ignored */
+                var data = {
+                    __RequestVerificationToken: __RequestVerificationToken,
+                    questionGroupViewModel: formData,
+                    process: "update"
+                };
+                var xhrParams = {
+                    requestMethod: "POST",
+                    url: "@updateAction",
+                    dataType: "json",
+                    data: data,
+                    formToValidateObj: $(formSelector),
+                    blockElem: ".page-container",
+                    iconOnly: false,
+                    message: "Güncelleniyor...",
+                    unblockOnComplete: true
+                };
+                var xhrPromise = jqAjax(xhrParams);
+                xhrPromise.done(function (xhr) {
+                    if (xhr.result.success) {
+                        toastr.success(xhr.result.text, 'İşlem Başarılı');
+                    } else {
+                        swal("Dikkat", xhr.result.text, "warning");
+                    }
+                });
+            });
+
+            $("#clone").on("click", function () {
+                bootbox.prompt({
+                    size: "small",
+                    title: "Yeni Ürün Kodu",
+                    maxlength: 3,
+                    placeholder: "3 haneli ürün kodu",
+                    callback: function (promptInputVal) {
+                        if (isObjValid(promptInputVal)) {
+                            promptInputVal = promptInputVal.toUpperCase();
+                            var data = {
+                                __RequestVerificationToken: __RequestVerificationToken
+                            };
+                            var xhrParams = {
+                                requestMethod: "POST",
+                                url: "@cloneAction/@questionGroupId/" + promptInputVal,
+                                dataType: "json",
+                                data: data,
+                                formToValidateObj: null,
+                                blockElem: ".page-container",
+                                iconOnly: false,
+                                message: "Kopyalanıyor...",
+                                unblockOnComplete: false
+                            };
+                            var xhrPromise = jqAjax(xhrParams);
+                            xhrPromise.done(function (xhr) {
+                                if (xhr.result.success) {
+                                    toastr.success(xhr.result.text, 'İşlem Başarılı');
+                                    goTo("/Products/Product/CreateUpdate/" + promptInputVal);
+                                } else {
+                                    swal("İşlem Başarısız", xhr.result.text, "error");
+                                }
+                            });
+                        }
+                    }
+                });
+            });
+
+        });
+        /* ends dom.ready */
+
+        function goTo(url) {
+            App.blockUI({
+                target: ".page-container",
+                iconOnly: false,
+                message: "<h4>Sayfa Yükleniyor...</h4>",
+                boxed: true
+            });
+            location.href = url;
+        }
+
+    </script>
+    @Html.RenderScripts() @*for rendering scripts from partial views and editor templates *@
+}

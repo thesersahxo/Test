@@ -1,0 +1,243 @@
+﻿@using Health.Web.Web.Framework
+@model IEnumerable<Health.Web.Areas.Products.Models.Question.AnswerViewModel>
+@{
+    // Make sure you pass QuestionId via ViewBag from your controller
+    var questionId = ViewBag.QuestionId;
+
+    Layout = null;
+    var areaName = ViewContext.RouteData.DataTokens["area"];
+    var actionName = ViewContext.RouteData.GetRequiredString("action");
+    var controllerName = ViewContext.RouteData.Values["controller"].ToString();
+
+    ViewBag.Title = "Cevap Yönetimi";
+    var addUrl = Url.Action("AddAnswer", @controllerName, new { area = (string)@areaName });
+    var editUrl = Url.Action("EditAnswer", @controllerName, new { area = (string)@areaName });
+    var deleteUrl = Url.Action("DeleteAnswer", @controllerName, new { area = (string)@areaName });
+
+}
+@Html.AntiForgeryToken()
+<div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+    <h4 class="modal-title" id="myModalLabel">@ViewBag.Title</h4>
+</div>
+<div class="modal-body">
+    <table class="table table-bordered" id="answers-table">
+        <thead>
+            <tr>
+                <th>Cevap</th>
+                <th>Sıra</th>
+                <th>İşlemler</th>
+            </tr>
+        </thead>
+        <tbody id="answers-tbody">
+            @foreach (var answer in Model)
+            {
+                <tr id="answerRow_@answer.Id">
+                    <td style="width:60%;">
+                        <span class="answer-text">@answer.Text</span>
+                        <input type="text" class="form-control answer-edit" value="@answer.Text" style="display:none; width: 80%;" />
+                    </td>
+                    <td style="width: 20%;">
+                        <span class="answer-order">@answer.DisplayOrder</span>
+                        <input type="number" min="0" class="form-control order-edit" value="@answer.DisplayOrder" style="display:none; width: 70px;" />
+                    </td>
+                    <td style="width: 20%;">
+                        <button class="btn btn-xs btn-primary btn-edit" onclick="startEditAnswer(@answer.Id)">Düzenle</button>
+                        <button class="btn btn-xs btn-success btn-save" onclick="saveEditAnswer(@answer.Id)" style="display:none;">Kaydet</button>
+                        <button class="btn btn-xs btn-default btn-cancel" onclick="cancelEditAnswer(@answer.Id)" style="display:none;">İptal</button>
+                        <button class="btn btn-xs btn-danger" onclick="deleteAnswer(@answer.Id)">Sil</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <button class="btn btn-success" id="btn-add-answer">Yeni Cevap Ekle</button>
+    <input type="hidden" id="currentQuestionId" value="@ViewBag.QuestionId" />
+</div>
+<div class="modal-footer">
+    <button class="btn" type="button" data-dismiss="modal"><i class="fa fa-times"></i> İptal</button>
+    <button class="btn btn-primary" type="submit" name="save-and-close"><i class="fa fa-check"></i> Kaydet</button>
+</div>
+
+<script>
+    $('#btn-add-answer').on('click', function () {
+        if ($('#answers-tbody tr.adding-row').length > 0) {
+            return;
+        }
+
+        // Mevcut en yüksek sıra değerini bul
+        var maxOrder = 0;
+        $('#answers-tbody tr').each(function () {
+            var orderVal = parseInt($(this).find('.answer-order').text(), 10);
+            if (!isNaN(orderVal) && orderVal > maxOrder) {
+                maxOrder = orderVal;
+            }
+        });
+        var nextOrder = maxOrder + 1;
+
+        var newRow = `
+                            <tr class="adding-row">
+                                <td>
+                                    <input type="text" class="form-control new-answer-input" placeholder="Yeni cevap girin" style="width:80%;" />
+                                </td>
+                                <td>
+                                    <input type="number" min="0" class="form-control new-order-input" placeholder="Sıra" style="width:70px;" value="` + nextOrder + `" />
+                                </td>
+                                <td>
+                                    <button class="btn btn-xs btn-success" onclick="saveNewAnswer(this)">Kaydet</button>
+                                    <button class="btn btn-xs btn-default" onclick="cancelNewAnswer(this)">İptal</button>
+                                </td>
+                            </tr>
+                        `;
+        $('#answers-tbody').append(newRow);
+    });
+
+    window.saveNewAnswer = function (btn) {
+        var tr = $(btn).closest('tr');
+        var newText = tr.find('.new-answer-input').val();
+        var newOrder = tr.find('.new-order-input').val();
+        var questionId = $('#currentQuestionId').val();
+
+        // Frontend benzersiz sıra kontrolü
+        var exists = false;
+        $('#answers-tbody tr').not(tr).each(function () {
+            var orderVal = $(this).find('.answer-order').text();
+            if (orderVal && orderVal == newOrder) {
+                exists = true;
+                return false;
+            }
+        });
+
+        if (exists) {
+            toastr.warning('Bu sıra numarası zaten kullanılıyor.');
+            return;
+        }
+
+        if (!newText) {
+            toastr.warning('Cevap metni boş olamaz.');
+            return;
+        }
+        $.ajax({
+            url: '@addUrl',
+            type: 'POST',
+            data: {
+                text: newText,
+                displayOrder: newOrder,
+                questionId: questionId,
+                __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+            },
+            success: function (result) {
+                if (result.success) {
+                    var answerId = result.id;
+                    var newAnswerRow = `
+                                        <tr id="answerRow_${answerId}">
+                                            <td>
+                                                <span class="answer-text">${newText}</span>
+                                                <input type="text" class="form-control answer-edit" value="${newText}" style="display:none; width: 80%;" />
+                                            </td>
+                                            <td>
+                                                <span class="answer-order">${newOrder}</span>
+                                                <input type="number" min="0" class="form-control order-edit" value="${newOrder}" style="display:none; width: 70px;" />
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-xs btn-primary btn-edit" onclick="startEditAnswer(${answerId})">Düzenle</button>
+                                                <button class="btn btn-xs btn-success btn-save" onclick="saveEditAnswer(${answerId})" style="display:none;">Kaydet</button>
+                                                <button class="btn btn-xs btn-default btn-cancel" onclick="cancelEditAnswer(${answerId})" style="display:none;">İptal</button>
+                                                <button class="btn btn-xs btn-danger" onclick="deleteAnswer(${answerId})">Sil</button>
+                                            </td>
+                                        </tr>
+                                    `;
+                    tr.replaceWith(newAnswerRow);
+                    toastr.success('Cevap eklendi.');
+                } else {
+                    toastr.error(result.message || 'Hata oluştu.');
+                }
+            }
+        });
+    }
+
+    window.startEditAnswer = function (id) {
+        var row = $('#answerRow_' + id);
+        row.find('.answer-text, .answer-order').hide();
+        row.find('.answer-edit, .order-edit').show().first().focus();
+        row.find('.btn-edit').hide();
+        row.find('.btn-save, .btn-cancel').show();
+    }
+
+    window.cancelEditAnswer = function (id) {
+        var row = $('#answerRow_' + id);
+        row.find('.answer-edit, .order-edit').hide();
+        row.find('.answer-text, .answer-order').show();
+        row.find('.btn-save, .btn-cancel').hide();
+        row.find('.btn-edit').show();
+    }
+
+    window.cancelNewAnswer = function (btn) {
+        $(btn).closest('tr').remove();
+    }
+
+    window.saveEditAnswer = function (id) {
+        var row = $('#answerRow_' + id);
+        var newText = row.find('.answer-edit').val();
+        var newOrder = row.find('.order-edit').val();
+
+        // Frontend benzersiz sıra kontrolü
+        var exists = false;
+        $('#answers-tbody tr').not(row).each(function () {
+            var orderVal = $(this).find('.answer-order').text();
+            if (orderVal && orderVal == newOrder) {
+                exists = true;
+                return false;
+            }
+        });
+        if (exists) {
+            toastr.warning('Bu sıra numarası zaten kullanılıyor.');
+            return;
+        }
+
+        $.ajax({
+            url: '@editUrl',
+            type: 'POST',
+            data: {
+                id: id,
+                text: newText,
+                displayOrder: newOrder,
+                __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+            },
+            success: function (result) {
+                if (result.success) {
+                    row.find('.answer-text').text(newText).show();
+                    row.find('.answer-order').text(newOrder).show();
+                    row.find('.answer-edit, .order-edit').hide();
+                    row.find('.btn-save, .btn-cancel').hide();
+                    row.find('.btn-edit').show();
+                    toastr.success('Cevap güncellendi.');
+                } else {
+                    toastr.error(result.message || 'Hata oluştu.');
+                }
+            }
+        });
+    }
+
+    window.deleteAnswer = function (id) {
+        if (!confirm('Bu cevabı silmek istediğinize emin misiniz?')) return;
+        $.ajax({
+            url: '@deleteUrl',
+            type: 'POST',
+            data: {
+                __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val(),
+                id: id,
+            },
+            success: function (result) {
+                if (result.success) {
+                    $('#answerRow_' + id).remove();
+                    toastr.success('Cevap silindi.');
+                } else {
+                    toastr.error(result.message || 'Hata oluştu.');
+                }
+            }
+        });
+    }
+</script>
+
+@Html.RenderScripts()
